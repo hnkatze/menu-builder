@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.figma.com)",
+      "mcp__figma_dev_mcp__get_image",
+      "Bash(npm run build:*)",
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(sed:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "figma_dev_mcp"
+  ]
+}
