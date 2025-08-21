@@ -171,7 +171,14 @@ export function MenuBuilderProvider({ children }: { children: React.ReactNode })
       // Otherwise load from IndexedDB
       const savedData = await loadData()
       if (savedData) {
-        dispatch({ type: "LOAD_DATA", payload: savedData })
+        // Validate and type the data before dispatching
+        const validatedData: MenuBuilderState = {
+          categories: Array.isArray(savedData.categories) ? savedData.categories as Category[] : [],
+          products: Array.isArray(savedData.products) ? savedData.products as Product[] : [],
+          activeCategory: savedData.activeCategory || null,
+          editingProduct: savedData.editingProduct || null,
+        }
+        dispatch({ type: "LOAD_DATA", payload: validatedData })
       }
     } catch {
       toast({
