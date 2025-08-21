@@ -17,7 +17,7 @@ export function ProductStep() {
   const { state, dispatch } = useMenuBuilder()
   const { toast } = useToast()
   const router = useRouter()
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedCategory, setSelectedCategory] = useState<string | number>("all")
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [categoryName, setCategoryName] = useState("")
@@ -34,7 +34,7 @@ export function ProductStep() {
     }
 
     const newCategory: Category = {
-      id: `category-${Date.now()}`,
+      id: Date.now(),
       name: categoryName.trim(),
       description: categoryDescription.trim(),
       order: state.categories.length,
@@ -44,7 +44,7 @@ export function ProductStep() {
     setCategoryName("")
     setCategoryDescription("")
     setShowCategoryForm(false)
-    setSelectedCategory(newCategory.id)
+    setSelectedCategory(newCategory.id.toString())
 
     toast({
       title: "Éxito",
@@ -52,7 +52,7 @@ export function ProductStep() {
     })
   }
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = (id: number) => {
     if (confirm("¿Estás seguro de que quieres eliminar este producto?")) {
       dispatch({ type: "DELETE_PRODUCT", payload: id })
       toast({
@@ -67,12 +67,12 @@ export function ProductStep() {
     router.push(`/agregar-producto${categoryParam}`)
   }
 
-  const handleEditProduct = (productId: string) => {
+  const handleEditProduct = (productId: number) => {
     router.push(`/agregar-producto?id=${productId}`)
   }
 
   const filteredProducts =
-    selectedCategory !== "all" ? state.products.filter((p) => p.categoryId === selectedCategory) : state.products
+    selectedCategory !== "all" ? state.products.filter((p) => p.categoryId === Number(selectedCategory)) : state.products
 
   return (
     <div className="space-y-6 animate-slide-in-up">
@@ -191,7 +191,7 @@ export function ProductStep() {
               Productos
               {selectedCategory !== "all" && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                  en {state.categories.find((c) => c.id === selectedCategory)?.name}
+                  en {state.categories.find((c) => c.id === Number(selectedCategory))?.name}
                 </span>
               )}
             </CardTitle>

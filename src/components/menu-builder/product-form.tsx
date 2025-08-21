@@ -7,7 +7,6 @@ import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
 import { Textarea } from "../../components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { Badge } from "../../components/ui/badge"
 import { Switch } from "../../components/ui/switch"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
@@ -45,7 +44,7 @@ export function ProductForm({
     description: "",
     price: 0,
     isv: 15, // Impuesto sobre venta por defecto 15%
-    categoryId: defaultCategoryId || (safeCategories.length > 0 ? safeCategories[0].id : ""),
+    categoryId: defaultCategoryId || (safeCategories.length > 0 ? safeCategories[0].id : 0),
     image: "",
     available: true,
     modifiers: [] as Modifier[],
@@ -80,7 +79,7 @@ export function ProductForm({
         name: initialProduct.name,
         description: initialProduct.description || "",
         price: initialProduct.price,
-        isv: 15,
+        isv: initialProduct.isv || 15,
         categoryId: initialProduct.categoryId,
         image: initialProduct.image || "",
         available: true,
@@ -88,8 +87,31 @@ export function ProductForm({
       })
       setImagePreview(initialProduct.image || "")
       setHasModifiers(initialProduct.modifiers && initialProduct.modifiers.length > 0)
+    } else {
+      // Reset form when initialProduct becomes null/undefined
+      setFormData({
+        name: "",
+        description: "",
+        price: 0,
+        isv: 15,
+        categoryId: defaultCategoryId || (safeCategories.length > 0 ? safeCategories[0].id : 0),
+        image: "",
+        available: true,
+        modifiers: [],
+      })
+      setImagePreview("")
+      setHasModifiers(false)
+      setCurrentModifier({
+        name: "",
+        modifierType: "single",
+        required: false,
+        min: 0,
+        max: 1,
+        options: []
+      })
+      setNewOption({ name: "", price: 0 })
     }
-  }, [initialProduct])
+  }, [initialProduct, defaultCategoryId, safeCategories])
 
   const handleImageChange = (url: string) => {
     setFormData(prev => ({ ...prev, image: url }))
@@ -142,25 +164,26 @@ export function ProductForm({
 
     const productData = {
       ...formData,
+      categoryId: Number(formData.categoryId),
       order: isEditing ? initialProduct?.order || 0 : 0,
     }
 
     onSave(productData)
     
-    // Reset form if not editing
-    if (!isEditing) {
-      resetForm()
-      toast({
-        title: "¡Éxito!",
-        description: "Producto agregado correctamente. Puedes seguir agregando más.",
-      })
-    }
+    // Reset form after save (both for adding and editing)
+    resetForm()
+    toast({
+      title: "¡Éxito!",
+      description: isEditing 
+        ? "Producto actualizado correctamente." 
+        : "Producto agregado correctamente. Puedes seguir agregando más.",
+    })
   }
 
   const addOptionToCurrentModifier = () => {
     if (newOption.name.trim()) {
       const option: ModifierOption = {
-        id: `option-${Date.now()}-${Math.random()}`,
+        id: Date.now() + Math.floor(Math.random() * 1000),
         name: newOption.name.trim(),
         price: newOption.price,
       }
@@ -182,7 +205,7 @@ export function ProductForm({
       } else {
         // Crear nuevo modificador
         const newModifier: Modifier = {
-          id: `modifier-${Date.now()}`,
+          id: Date.now(),
           name: modifierName,
           type: currentModifier.modifierType,
           required: currentModifier.required,
@@ -201,7 +224,7 @@ export function ProductForm({
     }
   }
 
-  const removeOptionFromCurrentModifier = (optionId: string) => {
+  const removeOptionFromCurrentModifier = (optionId: number) => {
     setCurrentModifier(prev => ({
       ...prev,
       options: prev.options.filter(opt => opt.id !== optionId)
@@ -225,7 +248,7 @@ export function ProductForm({
       description: "",
       price: 0,
       isv: 15,
-      categoryId: defaultCategoryId || (safeCategories.length > 0 ? safeCategories[0].id : ""),
+      categoryId: defaultCategoryId || (safeCategories.length > 0 ? safeCategories[0].id : 0),
       image: "",
       available: true,
       modifiers: [],
@@ -234,7 +257,7 @@ export function ProductForm({
     clearCurrentModifier()
   }
 
-  const removeModifier = (modifierId: string) => {
+  const removeModifier = (modifierId: number) => {
     setFormData((prev) => ({
       ...prev,
       modifiers: prev.modifiers.filter((m) => m.id !== modifierId),
@@ -311,32 +334,6 @@ export function ProductForm({
                   required
                 />
                 <p className="text-xs text-gray-500">Nombre claro y descriptivo del producto</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category">Categoría *</Label>
-                <Select
-                  value={formData.categoryId}
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, categoryId: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {safeCategories.length > 0 ? (
-                      safeCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>
-                        No hay categorías disponibles
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">Primero debes crear categorías en el menú principal</p>
               </div>
             </div>
 
@@ -491,7 +488,7 @@ export function ProductForm({
                         placeholder="Ej: Tamaño, Ingredientes Extra"
                         className="border-red-200 focus:border-red-400 focus:ring-red-200"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Si está vacío, se usará "Opciones"</p>
+                      <p className="text-xs text-gray-500 mt-1">Si está vacío, se usará &quot;Opciones&quot;</p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">

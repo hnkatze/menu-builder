@@ -16,18 +16,20 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip"
 import { BulkImport } from "./bulk-import"
+import { ExcelImport } from "./excel-import"
 import { useToast } from "../../hooks/use-toast"
-import { Eye, ArrowLeft, ArrowRight, Package, Plus, ChefHat, FolderPlus, Upload, Trash2, ChevronLeft, ChevronRight, HelpCircle, Info, Edit2 } from "lucide-react"
+import { Eye, ArrowLeft, ArrowRight, Package, Plus, ChefHat, FolderPlus, Upload, Trash2, ChevronLeft, ChevronRight, HelpCircle, Info, Edit2, FileSpreadsheet } from "lucide-react"
 
 export function PreviewStep() {
   const { state, dispatch } = useMenuBuilder()
   const { toast } = useToast()
   const router = useRouter()
   const [showBulkImport, setShowBulkImport] = useState(false)
+  const [showExcelImport, setShowExcelImport] = useState(false)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [categoryName, setCategoryName] = useState("")
   const [categoryDescription, setCategoryDescription] = useState("")
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const PRODUCTS_PER_PAGE = 5
 
@@ -39,7 +41,7 @@ export function PreviewStep() {
     setSelectedCategoryId(safeCategories[0].id)
   }
 
-  const getCategoryProducts = (categoryId: string) => {
+  const getCategoryProducts = (categoryId: number) => {
     return safeProducts.filter((product: Product) => product.categoryId === categoryId)
   }
 
@@ -54,7 +56,7 @@ export function PreviewStep() {
     }
 
     const newCategory: Category = {
-      id: `category-${Date.now()}`,
+      id: Date.now(),
       name: categoryName.trim(),
       description: categoryDescription.trim(),
       order: state.categories.length,
@@ -76,7 +78,7 @@ export function PreviewStep() {
     })
   }
 
-  const handleDeleteCategory = (categoryId: string) => {
+  const handleDeleteCategory = (categoryId: number) => {
     dispatch({ type: "DELETE_CATEGORY", payload: categoryId })
     toast({
       title: "Categoría eliminada",
@@ -94,14 +96,15 @@ export function PreviewStep() {
   const paginatedProducts = selectedCategoryProducts.slice(startIndex, endIndex)
 
   // Reset página cuando cambio de categoría
-  const handleCategoryChange = (categoryId: string) => {
+  const handleCategoryChange = (categoryId: number) => {
     setSelectedCategoryId(categoryId)
     setCurrentPage(1)
   }
 
-  const goToAddProducts = () => {
-    if (selectedCategoryId) {
-      router.push(`/agregar-producto?category=${selectedCategoryId}`)
+  const goToAddProducts = (categoryId?: number) => {
+    const targetCategoryId = categoryId || selectedCategoryId
+    if (targetCategoryId) {
+      router.push(`/agregar-producto?category=${targetCategoryId}`)
     }
   }
 
@@ -129,7 +132,7 @@ export function PreviewStep() {
               <h3 className="font-semibold text-blue-700 text-sm mb-1">Flujo recomendado:</h3>
               <ol className="text-sm text-blue-600 space-y-1 ml-3 list-decimal">
                 <li>Crea categorías para organizar tu menú</li>
-                <li>Haz clic en "Agregar Productos" para cada categoría</li>
+                <li>Haz clic en &quot;Agregar Productos&quot; para cada categoría</li>
                 <li>Usa importación masiva si tienes muchos productos</li>
               </ol>
             </div>
@@ -144,15 +147,26 @@ export function PreviewStep() {
                 <FolderPlus className="h-5 w-5" />
                 Crear Nueva Categoría
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBulkImport(true)}
-                className="flex items-center gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Importación Masiva
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBulkImport(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Importar CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowExcelImport(true)}
+                  className="flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Importar Excel
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -273,9 +287,13 @@ export function PreviewStep() {
         {/* Bulk Import Modal */}
         {showBulkImport && (
           <BulkImport
-            isOpen={showBulkImport}
             onClose={() => setShowBulkImport(false)}
           />
+        )}
+
+        {/* Excel Import Modal */}
+        {showExcelImport && (
+          <ExcelImport onClose={() => setShowExcelImport(false)} />
         )}
       </div>
     )
@@ -324,11 +342,28 @@ export function PreviewStep() {
                       className="w-full flex items-center gap-2 border-red-200 text-red-600 hover:bg-red-50"
                     >
                       <Upload className="w-4 h-4" />
-                      Importación Masiva
+                      Importar CSV
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Importa múltiples productos desde un archivo CSV o JSON</p>
+                    <p>Importa múltiples productos desde un archivo CSV</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowExcelImport(true)}
+                      className="w-full flex items-center gap-2 border-red-200 text-red-600 hover:bg-red-50"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Importar Excel
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Importa múltiples productos con modificadores desde Excel</p>
                   </TooltipContent>
                 </Tooltip>
                 
@@ -387,7 +422,6 @@ export function PreviewStep() {
                         onChange={(e) => setCategoryName(e.target.value)}
                         placeholder="Ej: Bebidas, Comidas"
                         className="border-red-200 focus:border-red-400 focus:ring-red-200 text-sm h-8"
-                        size="sm"
                       />
                     </div>
                     <div className="space-y-1">
@@ -408,7 +442,6 @@ export function PreviewStep() {
                         onChange={(e) => setCategoryDescription(e.target.value)}
                         placeholder="Descripción breve"
                         className="border-red-200 focus:border-red-400 focus:ring-red-200 text-sm h-8"
-                        size="sm"
                       />
                     </div>
                     <div className="flex gap-2">
@@ -482,7 +515,7 @@ export function PreviewStep() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
-                            onClick={goToAddProducts}
+                            onClick={() => goToAddProducts()}
                             className="w-full bg-red-500 hover:bg-red-600 text-white flex items-center gap-2"
                             size="sm"
                           >
@@ -508,6 +541,13 @@ export function PreviewStep() {
           {showBulkImport && (
             <div>
               <BulkImport onClose={() => setShowBulkImport(false)} />
+            </div>
+          )}
+
+          {/* Excel Import Modal */}
+          {showExcelImport && (
+            <div>
+              <ExcelImport onClose={() => setShowExcelImport(false)} />
             </div>
           )}
 
@@ -544,7 +584,7 @@ export function PreviewStep() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          onClick={goToAddProducts}
+                          onClick={() => goToAddProducts()}
                           className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-2"
                         >
                           <Plus className="h-4 w-4" />

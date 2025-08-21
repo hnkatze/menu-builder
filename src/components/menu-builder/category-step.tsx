@@ -34,7 +34,7 @@ export function CategoryStep() {
     }
 
     const newCategory: Category = {
-      id: `category-${Date.now()}`,
+      id: Date.now(),
       name: categoryName.trim(),
       description: categoryDescription.trim(),
       order: state.categories.length,
@@ -51,7 +51,7 @@ export function CategoryStep() {
     })
   }
 
-  const handleDeleteCategory = (categoryId: string) => {
+  const handleDeleteCategory = (categoryId: number) => {
     dispatch({ type: "DELETE_CATEGORY", payload: categoryId })
     toast({
       title: "Categoría eliminada",
@@ -59,11 +59,11 @@ export function CategoryStep() {
     })
   }
 
-  const getCategoryProducts = (categoryId: string) => {
+  const getCategoryProducts = (categoryId: number) => {
     return state.products.filter((product) => product.categoryId === categoryId)
   }
 
-  const goToAddProducts = (categoryId: string) => {
+  const goToAddProducts = (categoryId: number) => {
     router.push(`/agregar-producto?category=${categoryId}`)
   }
 
@@ -85,7 +85,7 @@ export function CategoryStep() {
             <h3 className="font-semibold text-blue-700 text-sm mb-1">Flujo recomendado:</h3>
             <ol className="text-sm text-blue-600 space-y-1 ml-3 list-decimal">
               <li>Crea categorías para organizar tu menú</li>
-              <li>Haz clic en "Agregar Productos" para cada categoría</li>
+              <li>Haz clic en &quot;Agregar Productos&quot; para cada categoría</li>
               <li>Usa importación masiva si tienes muchos productos</li>
             </ol>
           </div>
@@ -229,7 +229,6 @@ export function CategoryStep() {
       {/* Bulk Import Modal */}
       {showBulkImport && (
         <BulkImport
-          isOpen={showBulkImport}
           onClose={() => setShowBulkImport(false)}
         />
       )}

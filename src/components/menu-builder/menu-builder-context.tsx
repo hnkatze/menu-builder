@@ -3,16 +3,17 @@
 import type React from "react"
 import { createContext, useContext, useReducer, useEffect, useCallback } from "react"
 import { useToast } from "../../hooks/use-toast"
+import { useIndexedDB } from "../../hooks/use-indexed-db"
 
 export interface Category {
-  id: string
+  id: number
   name: string
   description?: string
   order: number
 }
 
 export interface Modifier {
-  id: string
+  id: number
   name: string
   type: "single" | "multiple"
   required: boolean
@@ -22,17 +23,18 @@ export interface Modifier {
 }
 
 export interface ModifierOption {
-  id: string
+  id: number
   name: string
   price: number
 }
 
 export interface Product {
-  id: string
-  categoryId: string
+  id: number
+  categoryId: number
   name: string
   description: string
   price: number
+  isv: number
   image?: string
   modifiers: Modifier[]
   order: number
@@ -41,21 +43,21 @@ export interface Product {
 interface MenuBuilderState {
   categories: Category[]
   products: Product[]
-  activeCategory: string | null
-  editingProduct: string | null
+  activeCategory: number | null
+  editingProduct: number | null
 }
 
 type MenuBuilderAction =
   | { type: "ADD_CATEGORY"; payload: Category }
   | { type: "UPDATE_CATEGORY"; payload: Category }
-  | { type: "DELETE_CATEGORY"; payload: string }
+  | { type: "DELETE_CATEGORY"; payload: number }
   | { type: "REORDER_CATEGORIES"; payload: Category[] }
   | { type: "ADD_PRODUCT"; payload: Product }
   | { type: "UPDATE_PRODUCT"; payload: Product }
-  | { type: "DELETE_PRODUCT"; payload: string }
+  | { type: "DELETE_PRODUCT"; payload: number }
   | { type: "REORDER_PRODUCTS"; payload: Product[] }
-  | { type: "SET_ACTIVE_CATEGORY"; payload: string | null }
-  | { type: "SET_EDITING_PRODUCT"; payload: string | null }
+  | { type: "SET_ACTIVE_CATEGORY"; payload: number | null }
+  | { type: "SET_EDITING_PRODUCT"; payload: number | null }
   | { type: "LOAD_DATA"; payload: MenuBuilderState }
   | { type: "CLEAR_DATA" }
 
@@ -132,8 +134,8 @@ function menuBuilderReducer(state: MenuBuilderState, action: MenuBuilderAction):
 interface MenuBuilderContextType {
   state: MenuBuilderState
   dispatch: React.Dispatch<MenuBuilderAction>
-  saveToLocalStorage: () => void
-  loadFromLocalStorage: () => void
+  saveToIndexedDB: () => Promise<void>
+  loadFromIndexedDB: () => Promise<void>
   exportToJSON: () => string
   importFromJSON: (jsonString: string) => void
 }
@@ -143,38 +145,42 @@ const MenuBuilderContext = createContext<MenuBuilderContextType | undefined>(und
 export function MenuBuilderProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(menuBuilderReducer, initialState)
   const { toast } = useToast()
+  const { saveData, loadData, clearData, migrateFromLocalStorage } = useIndexedDB()
 
-  const saveToLocalStorage = useCallback(() => {
+  const saveToIndexedDB = useCallback(async () => {
     try {
-      localStorage.setItem("menuBuilderData", JSON.stringify(state))
+      await saveData(state)
     } catch {
       toast({
         title: "Error",
-        description: "Failed to save data to local storage",
+        description: "Failed to save data to IndexedDB",
         variant: "destructive",
       })
     }
-  }, [state, toast])
+  }, [state, saveData, toast])
 
-  const loadFromLocalStorage = useCallback(() => {
+  const loadFromIndexedDB = useCallback(async () => {
     try {
-      const savedData = localStorage.getItem("menuBuilderData")
+      // First try to migrate from localStorage
+      const migratedData = await migrateFromLocalStorage()
+      if (migratedData) {
+        dispatch({ type: "LOAD_DATA", payload: migratedData })
+        return
+      }
+
+      // Otherwise load from IndexedDB
+      const savedData = await loadData()
       if (savedData) {
-        const parsedData = JSON.parse(savedData)
-        dispatch({ type: "LOAD_DATA", payload: parsedData })
-        toast({
-          title: "Success",
-          description: "Data loaded successfully",
-        })
+        dispatch({ type: "LOAD_DATA", payload: savedData })
       }
     } catch {
       toast({
         title: "Error",
-        description: "Failed to load data from local storage",
+        description: "Failed to load data from IndexedDB",
         variant: "destructive",
       })
     }
-  }, [dispatch, toast])
+  }, [loadData, migrateFromLocalStorage, dispatch, toast])
 
   const exportToJSON = () => {
     const menu = state.categories.map((category) => ({
@@ -206,7 +212,7 @@ export function MenuBuilderProvider({ children }: { children: React.ReactNode })
       const products: Product[] = []
 
       data.menu.forEach((categoryData: { category: string; description?: string; products?: unknown[] }, categoryIndex: number) => {
-        const categoryId = `category-${Date.now()}-${categoryIndex}`
+        const categoryId = Date.now() + categoryIndex
         const category: Category = {
           id: categoryId,
           name: categoryData.category,
@@ -217,13 +223,14 @@ export function MenuBuilderProvider({ children }: { children: React.ReactNode })
 
         if (categoryData.products && Array.isArray(categoryData.products)) {
           categoryData.products.forEach((productData: unknown, productIndex: number) => {
-            const data = productData as { name: string; description?: string; price: number; image?: string; modifiers?: Modifier[] }
+            const data = productData as { name: string; description?: string; price: number; isv?: number; image?: string; modifiers?: Modifier[] }
             const product: Product = {
-              id: `product-${Date.now()}-${categoryIndex}-${productIndex}`,
+              id: Date.now() + categoryIndex * 1000 + productIndex,
               categoryId,
               name: data.name,
               description: data.description || "",
               price: data.price,
+              isv: data.isv || 15,
               image: data.image,
               modifiers: data.modifiers || [],
               order: productIndex,
@@ -256,25 +263,25 @@ export function MenuBuilderProvider({ children }: { children: React.ReactNode })
     }
   }
 
-  // Auto-save to localStorage whenever state changes
+  // Auto-save to IndexedDB whenever state changes
   useEffect(() => {
     if (state.categories.length > 0 || state.products.length > 0) {
-      saveToLocalStorage()
+      saveToIndexedDB()
     }
-  }, [state, saveToLocalStorage])
+  }, [state, saveToIndexedDB])
 
   // Load data on mount
   useEffect(() => {
-    loadFromLocalStorage()
-  }, [loadFromLocalStorage])
+    loadFromIndexedDB()
+  }, [loadFromIndexedDB])
 
   return (
     <MenuBuilderContext.Provider
       value={{
         state,
         dispatch,
-        saveToLocalStorage,
-        loadFromLocalStorage,
+        saveToIndexedDB,
+        loadFromIndexedDB,
         exportToJSON,
         importFromJSON,
       }}

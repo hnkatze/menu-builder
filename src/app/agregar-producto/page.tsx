@@ -16,8 +16,10 @@ export default function AgregarProductoPage() {
   const searchParams = useSearchParams()
   const { state, dispatch } = useMenuBuilder()
 
-  const productId = searchParams.get("id") || searchParams.get("edit")
-  const categoryId = searchParams.get("category")
+  const productIdParam = searchParams.get("id") || searchParams.get("edit")
+  const categoryIdParam = searchParams.get("category")
+  const productId = productIdParam ? parseInt(productIdParam) : null
+  const categoryId = categoryIdParam ? parseInt(categoryIdParam) : null
   const isEditing = !!productId
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -34,13 +36,24 @@ export default function AgregarProductoPage() {
   }, [isEditing, productId, state.products])
 
   const handleSave = (productData: Omit<Product, 'id' | 'order'>) => {
-    if (isEditing) {
-      dispatch({ type: "UPDATE_PRODUCT", payload: { ...productData, id: productId!, order: product?.order || 0 } })
+    if (isEditing && productId) {
+      const updatedProduct = { 
+        ...productData, 
+        id: productId, 
+        order: product?.order || 0 
+      }
+      dispatch({ type: "UPDATE_PRODUCT", payload: updatedProduct })
       setProduct(null) // Clear editing state
+      
+      // Clear query parameters to exit edit mode
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete("edit")
+      newUrl.searchParams.delete("id")
+      router.replace(newUrl.pathname + newUrl.search)
     } else {
       const newProduct = {
         ...productData,
-        id: `product-${Date.now()}`,
+        id: Date.now(),
         order: state.products.length,
       }
       dispatch({ type: "ADD_PRODUCT", payload: newProduct })
@@ -54,7 +67,7 @@ export default function AgregarProductoPage() {
     setProduct(productToEdit)
   }
 
-  const handleDelete = (productId: string) => {
+  const handleDelete = (productId: number) => {
     dispatch({ type: "DELETE_PRODUCT", payload: productId })
     if (product?.id === productId) {
       setProduct(null)
@@ -73,7 +86,7 @@ export default function AgregarProductoPage() {
   const endIndex = startIndex + PRODUCTS_PER_PAGE
   const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
 
-  const getCategoryName = (catId: string) => {
+  const getCategoryName = (catId: number) => {
     const category = state.categories.find(c => c.id === catId)
     return category?.name || 'Sin categoría'
   }
@@ -127,9 +140,18 @@ export default function AgregarProductoPage() {
             <ProductForm
               categories={state.categories}
               onSave={handleSave}
-              onCancel={() => setProduct(null)}
+              onCancel={() => {
+                setProduct(null)
+                // Clear query parameters when canceling edit
+                if (isEditing) {
+                  const newUrl = new URL(window.location.href)
+                  newUrl.searchParams.delete("edit")
+                  newUrl.searchParams.delete("id")
+                  router.replace(newUrl.pathname + newUrl.search)
+                }
+              }}
               initialProduct={product || undefined}
-              defaultCategoryId={categoryId || undefined}
+              defaultCategoryId={categoryId?.toString() || undefined}
               showButtons={true}
             />
           </CardContent>
@@ -183,9 +205,9 @@ export default function AgregarProductoPage() {
                       </TableCell>
                       <TableCell>{getCategoryName(prod.categoryId)}</TableCell>
                       <TableCell>L. {prod.price.toFixed(2)}</TableCell>
-                      <TableCell>15%</TableCell>
+                      <TableCell>{prod.isv}%</TableCell>
                       <TableCell className="font-semibold text-green-600">
-                        L. {(prod.price * 1.15).toFixed(2)}
+                        L. {(prod.price * (1 + prod.isv / 100)).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">

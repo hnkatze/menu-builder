@@ -6,9 +6,7 @@ import { useState } from "react"
 import { useMenuBuilder } from "./menu-builder-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
 import { Button } from "../../components/ui/button"
-import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
-import { Textarea } from "../../components/ui/textarea"
 import { useToast } from "../../hooks/use-toast"
 import { Download, Copy, FileJson, Upload, ArrowLeft, CheckCircle, Settings, AlertCircle, Trash2 } from "lucide-react"
 
@@ -22,28 +20,39 @@ export function ExportStep() {
 
   const generateMenuJSON = () => {
     const menuData = {
-      metadata: {
-        name: "Mi Restaurante",
-        description: "",
-        currency: "HNL",
-        createdAt: new Date().toISOString(),
-        version: "1.0",
-      },
-      categories: safeCategories.map((category: Category) => ({
+      menu: safeCategories.map((category: Category) => ({
         id: category.id,
         name: category.name,
-        description: category.description || "",
-        order: category.order || 0,
+        products: safeProducts
+          .filter((product: Product) => product.categoryId === category.id)
+          .map((product: Product) => ({
+            id: product.id,
+            name: product.name,
+            description: product.description || "",
+            price: product.price,
+            isv: product.isv || 15,
+            image: product.image || null,
+            modifiers: (product.modifiers || []).map((modifier, index) => ({
+              id: modifier.id,
+              name: modifier.name,
+              min: modifier.min,
+              max: modifier.max,
+              type: modifier.type === "single" ? 1 : 2,
+              position: index + 1,
+              options: (modifier.options || []).map((option, optIndex) => ({
+                id: option.id,
+                label: option.name,
+                value: option.price
+              }))
+            }))
+          }))
       })),
-      products: safeProducts.map((product: Product) => ({
-        id: product.id,
-        name: product.name,
-        description: product.description || "",
-        price: product.price,
-        categoryId: product.categoryId,
-        image: product.image || "",
-        order: product.order || 0,
-      })),
+      metadata: {
+        created: new Date().toISOString(),
+        totalCategories: safeCategories.length,
+        totalProducts: safeProducts.length,
+        totalModifiers: safeProducts.reduce((total, product) => total + (product.modifiers?.length || 0), 0)
+      }
     }
     return JSON.stringify(menuData, null, 2)
   }

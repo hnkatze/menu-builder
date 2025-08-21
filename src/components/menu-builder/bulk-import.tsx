@@ -158,10 +158,11 @@ export function BulkImport({ onClose }: BulkImportProps) {
           }
 
           const product = {
-            id: `product-${Date.now()}-${index}`,
+            id: Date.now() + index,
             name: productData.name,
             description: productData.description || "",
             price: Number.parseFloat(String(productData.price)) || 0,
+            isv: 15,
             categoryId: selectedCategory,
             modifiers: [],
             order: state.products.length + index,
