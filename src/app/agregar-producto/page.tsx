@@ -10,11 +10,13 @@ import { Badge } from "../../components/ui/badge"
 import { ProductForm } from "../../components/menu-builder/product-form"
 import { useMenuBuilder } from "../../components/menu-builder/menu-builder-context"
 import type { Product } from "../../components/menu-builder/menu-builder-context"
+import { useToast } from "../../hooks/use-toast"
 
 export default function AgregarProductoPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { state, dispatch } = useMenuBuilder()
+  const { toast } = useToast()
 
   const productIdParam = searchParams.get("id") || searchParams.get("edit")
   const categoryIdParam = searchParams.get("category")
@@ -45,11 +47,19 @@ export default function AgregarProductoPage() {
       dispatch({ type: "UPDATE_PRODUCT", payload: updatedProduct })
       setProduct(null) // Clear editing state
       
-      // Clear query parameters to exit edit mode
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete("edit")
-      newUrl.searchParams.delete("id")
-      router.replace(newUrl.pathname + newUrl.search)
+      // Show success message
+      toast({
+        title: "¡Producto actualizado!",
+        description: "Los cambios han sido guardados correctamente.",
+      })
+      
+      // Clear query parameters to exit edit mode (delayed to prevent scroll)
+      setTimeout(() => {
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete("edit")
+        newUrl.searchParams.delete("id")
+        router.replace(newUrl.pathname + newUrl.search, { scroll: false })
+      }, 100)
     } else {
       const newProduct = {
         ...productData,
@@ -65,6 +75,13 @@ export default function AgregarProductoPage() {
 
   const handleEdit = (productToEdit: Product) => {
     setProduct(productToEdit)
+    // Update URL to include edit parameters
+    const newUrl = new URL(window.location.href)
+    newUrl.searchParams.set("edit", String(productToEdit.id))
+    if (productToEdit.categoryId) {
+      newUrl.searchParams.set("category", String(productToEdit.categoryId))
+    }
+    router.replace(newUrl.pathname + newUrl.search)
   }
 
   const handleDelete = (productId: number) => {

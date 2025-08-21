@@ -22,7 +22,7 @@ export function BulkImport({ onClose }: BulkImportProps) {
   const { state, dispatch } = useMenuBuilder()
   const { toast } = useToast()
   const [importData, setImportData] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [importMethod, setImportMethod] = useState<"csv" | "json">("csv")
 
   const csvTemplate = `nombre,descripcion,precio,alergenos,dietetico
@@ -237,13 +237,16 @@ export function BulkImport({ onClose }: BulkImportProps) {
 
             <div className="space-y-2">
               <Label>Categoría Destino</Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select 
+                value={selectedCategory ? String(selectedCategory) : ""} 
+                onValueChange={(value) => setSelectedCategory(value ? Number(value) : null)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent>
                   {state.categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
+                    <SelectItem key={category.id} value={String(category.id)}>
                       {category.name}
                     </SelectItem>
                   ))}

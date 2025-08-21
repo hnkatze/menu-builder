@@ -20,21 +20,36 @@ interface ExcelImportProps {
 export function ExcelImport({ onClose }: ExcelImportProps) {
   const { state, dispatch } = useMenuBuilder()
   const { toast } = useToast()
-  const [selectedCategory, setSelectedCategory] = useState("")
-  const [uploadedData, setUploadedData] = useState<Record<string, unknown>>({})
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [uploadedData, setUploadedData] = useState<{
+    categories?: unknown[][]
+    products?: unknown[][]
+    modifiers?: unknown[][]
+  }>({})
 
-  // Función para crear plantilla Excel con modificadores OPCIONALES
+  // Función para crear plantilla Excel con categorías, productos y modificadores
   const createExcelTemplate = () => {
-    // Hoja 1: Productos principales
-    const productsData = [
-      ['nombre', 'descripcion', 'precio', 'imagen'],
-      ['Pizza Margherita', 'Salsa de tomate clásica con mozzarella fresca y albahaca', 12.99, ''],
-      ['Ensalada César', 'Lechuga romana crujiente con parmesano y crutones', 8.50, ''],
-      ['Salmón a la Parrilla', 'Salmón atlántico fresco con condimento de hierbas y limón', 18.99, ''],
-      ['Hamburguesa Clásica', 'Carne de res con lechuga, tomate y cebolla', 14.50, '']
+    // Hoja 1: Categorías
+    const categoriesData = [
+      ['nombre', 'descripcion'],
+      ['Pizzas', 'Deliciosas pizzas artesanales con ingredientes frescos'],
+      ['Ensaladas', 'Ensaladas frescas y saludables con ingredientes premium'],
+      ['Carnes', 'Carnes selectas a la parrilla con la mejor calidad'],
+      ['Hamburguesas', 'Hamburguesas gourmet con ingredientes artesanales'],
+      ['Bebidas', 'Refrescantes bebidas naturales y sodas']
     ]
 
-    // Hoja 2: Modificadores (todos OPCIONALES)
+    // Hoja 2: Productos principales
+    const productsData = [
+      ['categoria_nombre', 'nombre', 'descripcion', 'precio', 'imagen'],
+      ['Pizzas', 'Pizza Margherita', 'Salsa de tomate clásica con mozzarella fresca y albahaca', 12.99, ''],
+      ['Ensaladas', 'Ensalada César', 'Lechuga romana crujiente con parmesano y crutones', 8.50, ''],
+      ['Carnes', 'Salmón a la Parrilla', 'Salmón atlántico fresco con condimento de hierbas y limón', 18.99, ''],
+      ['Hamburguesas', 'Hamburguesa Clásica', 'Carne de res con lechuga, tomate y cebolla', 14.50, ''],
+      ['Bebidas', 'Limonada Natural', 'Refrescante limonada con limones frescos', 3.50, '']
+    ]
+
+    // Hoja 3: Modificadores (todos OPCIONALES)
     const modifiersData = [
       ['producto_nombre', 'modificador_nombre', 'modificador_tipo', 'modificador_requerido', 'modificador_min', 'modificador_max', 'opcion_nombre', 'opcion_precio'],
       ['Pizza Margherita', 'Tamaño', 'single', 'NO', 0, 1, 'Personal (20cm)', 0],
@@ -50,14 +65,22 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
       ['Hamburguesa Clásica', 'Cocción', 'single', 'NO', 0, 1, 'Bien Cocida', 0],
       ['Hamburguesa Clásica', 'Extras', 'multiple', 'NO', 0, 4, 'Tocino', 2],
       ['Hamburguesa Clásica', 'Extras', 'multiple', 'NO', 0, 4, 'Queso Cheddar', 1.5],
-      ['Hamburguesa Clásica', 'Extras', 'multiple', 'NO', 0, 4, 'Aguacate', 2.5]
+      ['Hamburguesa Clásica', 'Extras', 'multiple', 'NO', 0, 4, 'Aguacate', 2.5],
+      ['Limonada Natural', 'Tamaño', 'single', 'NO', 0, 1, 'Pequeño (250ml)', 0],
+      ['Limonada Natural', 'Tamaño', 'single', 'NO', 0, 1, 'Grande (500ml)', 1.5]
     ]
 
-    // Hoja 3: Instrucciones
+    // Hoja 4: Instrucciones
+    // Hoja 4: Instrucciones
     const instructionsData = [
       ['INSTRUCCIONES PARA IMPORTACIÓN EXCEL'],
       [''],
+      ['HOJA "Categorías":'],
+      ['- nombre: Nombre de la categoría (requerido)'],
+      ['- descripcion: Descripción de la categoría (opcional)'],
+      [''],
       ['HOJA "Productos":'],
+      ['- categoria_nombre: Debe coincidir exactamente con el nombre en la hoja Categorías'],
       ['- nombre: Nombre del producto (requerido)'],
       ['- descripcion: Descripción del producto'],
       ['- precio: Precio base del producto (requerido)'],
@@ -78,10 +101,13 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
       ['- Para ingredientes opcionales múltiples: tipo="multiple", requerido="NO", min=0, max=5'],
       [''],
       ['NOTAS IMPORTANTES:'],
-      ['- Los nombres de productos deben ser exactamente iguales en ambas hojas'],
+      ['- Los nombres de categorías deben ser exactamente iguales entre hojas Categorías y Productos'],
+      ['- Los nombres de productos deben ser exactamente iguales entre hojas Productos y Modificadores'],
       ['- Cada fila en Modificadores representa UNA opción de UN modificador'],
+      ['- Si una categoría no tiene productos, no necesita aparecer en la hoja Productos'],
       ['- Si un producto no tiene modificadores, no necesita aparecer en la hoja Modificadores'],
       ['- Los precios deben ser números (use punto decimal, ej: 12.99)'],
+      ['- Las categorías se crearán automáticamente en el orden que aparecen en el Excel'],
       ['- TODOS los modificadores son opcionales por defecto para mayor flexibilidad']
     ]
 
@@ -89,16 +115,24 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
     const wb = XLSX.utils.book_new()
     
     // Agregar hojas
+    const wsCategories = XLSX.utils.aoa_to_sheet(categoriesData)
     const wsProducts = XLSX.utils.aoa_to_sheet(productsData)
     const wsModifiers = XLSX.utils.aoa_to_sheet(modifiersData)
     const wsInstructions = XLSX.utils.aoa_to_sheet(instructionsData)
     
+    XLSX.utils.book_append_sheet(wb, wsCategories, "Categorías")
     XLSX.utils.book_append_sheet(wb, wsProducts, "Productos")
     XLSX.utils.book_append_sheet(wb, wsModifiers, "Modificadores")
     XLSX.utils.book_append_sheet(wb, wsInstructions, "Instrucciones")
 
     // Aplicar estilos básicos (ancho de columnas)
+    wsCategories['!cols'] = [
+      { width: 20 }, // nombre
+      { width: 50 }  // descripcion
+    ]
+
     wsProducts['!cols'] = [
+      { width: 20 }, // categoria_nombre
       { width: 20 }, // nombre
       { width: 50 }, // descripcion
       { width: 10 }, // precio
@@ -138,6 +172,11 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
         const workbook = XLSX.read(data, { type: 'array' })
         
+        // Leer hoja de categorías (si existe)
+        const categoriesSheet = workbook.Sheets['Categorías']
+        const categoriesData = categoriesSheet ? 
+          XLSX.utils.sheet_to_json(categoriesSheet, { header: 1 }) as unknown[][] : []
+        
         // Leer hoja de productos
         const productsSheet = workbook.Sheets['Productos']
         if (!productsSheet) {
@@ -150,11 +189,11 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
         const modifiersData = modifiersSheet ? 
           XLSX.utils.sheet_to_json(modifiersSheet, { header: 1 }) as unknown[][] : []
 
-        setUploadedData({ products: productsData, modifiers: modifiersData })
+        setUploadedData({ categories: categoriesData, products: productsData, modifiers: modifiersData })
         
         toast({
           title: "Archivo Cargado",
-          description: `Se cargaron ${productsData.length - 1} productos para importar.`,
+          description: `Se cargaron ${categoriesData.length > 1 ? categoriesData.length - 1 : 0} categorías y ${productsData.length - 1} productos para importar.`,
         })
         
       } catch (error) {
@@ -181,39 +220,70 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
       return
     }
 
-    if (!selectedCategory) {
-      toast({
-        title: "Sin Categoría",
-        description: "Por favor selecciona una categoría para los productos.",
-        variant: "destructive",
-      })
-      return
-    }
-
     try {
+      const categoriesData = uploadedData.categories || []
       const productsData = uploadedData.products
       const modifiersData = uploadedData.modifiers || []
       
+      // Crear mapa de categorías existentes y nuevas
+      const categoriesMap: { [categoryName: string]: number } = {}
+      let categoriesCreated = 0
+      
+      // Procesar categorías desde Excel (si existen)
+      if (categoriesData.length > 1) {
+        const catHeaders = categoriesData[0] as any[]
+        const catRows = categoriesData.slice(1).filter((row: any[]) => row[0])
+        
+        catRows.forEach((row: any[], index: number) => {
+          const categoryName = row[0] as string
+          const description = (row[1] as string) || ""
+          
+          if (!categoryName) return
+          
+          // Verificar si la categoría ya existe
+          const existingCategory = state.categories.find(cat => 
+            cat.name.toLowerCase() === categoryName.toLowerCase()
+          )
+          
+          if (existingCategory) {
+            categoriesMap[categoryName] = existingCategory.id
+          } else {
+            // Crear nueva categoría
+            const newCategoryId = Date.now() + index
+            const newCategory = {
+              id: newCategoryId,
+              name: categoryName,
+              description,
+              order: state.categories.length + categoriesCreated
+            }
+            
+            dispatch({ type: "ADD_CATEGORY", payload: newCategory })
+            categoriesMap[categoryName] = newCategoryId
+            categoriesCreated++
+          }
+        })
+      }
+      
       // Procesar productos
-      const headers = productsData[0]
+      const headers = productsData[0] as any[]
       const products = productsData.slice(1).filter((row: any[]) => row[0]) // Filtrar filas vacías
 
       // Crear mapa de modificadores por producto
       const modifiersMap: { [productName: string]: Modifier[] } = {}
       
       if (modifiersData.length > 1) {
-        const modHeaders = modifiersData[0]
+        const modHeaders = modifiersData[0] as any[]
         const modRows = modifiersData.slice(1).filter((row: any[]) => row[0])
         
         modRows.forEach((row: any[]) => {
-          const productName = row[0]
-          const modifierName = row[1]
+          const productName = row[0] as string
+          const modifierName = row[1] as string
           const modifierType = row[2] as 'single' | 'multiple'
           const isRequired = row[3] === 'SI'
-          const min = parseInt(row[4]) || 0
-          const max = parseInt(row[5]) || 1
-          const optionName = row[6]
-          const optionPrice = parseFloat(row[7]) || 0
+          const min = parseInt(row[4] as string) || 0
+          const max = parseInt(row[5] as string) || 1
+          const optionName = row[6] as string
+          const optionPrice = parseFloat(row[7] as string) || 0
 
           if (!modifiersMap[productName]) {
             modifiersMap[productName] = []
@@ -224,7 +294,7 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
           
           if (!modifier) {
             modifier = {
-              id: `mod-${Date.now()}-${Math.random()}`,
+              id: Date.now() + Math.random(),
               name: modifierName,
               type: modifierType,
               required: isRequired,
@@ -237,7 +307,7 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
 
           // Agregar opción al modificador
           modifier.options.push({
-            id: `opt-${Date.now()}-${Math.random()}`,
+            id: Date.now() + Math.random(),
             name: optionName,
             price: optionPrice
           })
@@ -250,21 +320,53 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
       // Crear productos
       products.forEach((row: any[], index: number) => {
         try {
-          const productName = row[0]
-          const description = row[1] || ""
-          const price = parseFloat(row[2]) || 0
-          const image = row[3] || ""
+          let categoryName: string
+          let productName: string
+          let description: string
+          let price: number
+          let image: string
+          
+          // Determinar si el formato incluye categoria_nombre o no
+          if (headers.length >= 5 && headers[0] === 'categoria_nombre') {
+            // Formato nuevo con categorías
+            categoryName = row[0] as string
+            productName = row[1] as string
+            description = (row[2] as string) || ""
+            price = parseFloat(row[3] as string) || 0
+            image = (row[4] as string) || ""
+          } else {
+            // Formato anterior sin categorías (usar categoría seleccionada)
+            if (!selectedCategory) {
+              throw new Error('Debes seleccionar una categoría para productos sin categoría definida')
+            }
+            categoryName = ""
+            productName = row[0] as string
+            description = (row[1] as string) || ""
+            price = parseFloat(row[2] as string) || 0
+            image = (row[3] as string) || ""
+          }
 
           if (!productName || !price) {
             throw new Error(`Faltan campos requeridos en la fila ${index + 2}`)
           }
 
+          // Determinar la categoría a usar
+          let categoryId: number
+          if (categoryName && categoriesMap[categoryName]) {
+            categoryId = categoriesMap[categoryName]
+          } else if (selectedCategory) {
+            categoryId = selectedCategory
+          } else {
+            throw new Error(`No se encontró la categoría "${categoryName}" para el producto "${productName}"`)
+          }
+
           const product: Product = {
-            id: `product-${Date.now()}-${index}`,
+            id: Date.now() + index,
             name: productName,
             description,
             price,
-            categoryId: selectedCategory,
+            isv: 0, // Valor por defecto
+            categoryId,
             modifiers: modifiersMap[productName] || [],
             order: state.products.length + index,
             image
@@ -280,7 +382,7 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
 
       toast({
         title: "Importación Completa",
-        description: `Se importaron ${successCount} productos exitosamente. ${errorCount > 0 ? `${errorCount} errores.` : ""}`,
+        description: `Se importaron ${categoriesCreated > 0 ? `${categoriesCreated} categorías y ` : ""}${successCount} productos exitosamente. ${errorCount > 0 ? `${errorCount} errores.` : ""}`,
       })
 
       if (successCount > 0) {
@@ -311,33 +413,76 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Categoría */}
-          <div className="space-y-2">
-            <Label>Categoría Destino</Label>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                {state.categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Selección de categoría (solo si no hay categorías en Excel) */}
+          {(!uploadedData.categories || uploadedData.categories.length <= 1) && (
+            <div className="space-y-2">
+              <Label>Categoría Destino (Requerida sin hoja Categorías)</Label>
+              <Select 
+                value={selectedCategory ? String(selectedCategory) : ""} 
+                onValueChange={(value) => setSelectedCategory(value ? Number(value) : null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar categoría existente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {state.categories.map((category) => (
+                    <SelectItem key={category.id} value={String(category.id)}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Todos los productos se asignarán a esta categoría (solo aplica si no incluyes la hoja "Categorías")
+              </p>
+            </div>
+          )}
+
+          {/* Información de categorías incluidas en Excel */}
+          {uploadedData.categories && uploadedData.categories.length > 1 && (
+            <div className="space-y-2">
+              <Label>Categorías Detectadas en Excel</Label>
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-sm mb-2">
+                  <strong>Categorías encontradas:</strong> {uploadedData.categories.length - 1}
+                </p>
+                <pre className="text-xs">
+                  {uploadedData.categories.slice(0, 4).map((row: any[], i: number) => 
+                    i === 0 ? `${row.join(' | ')} (HEADERS)` : `${row.join(' | ')}`
+                  ).join('\n')}
+                  {uploadedData.categories.length > 4 && '\n...más categorías...'}
+                </pre>
+                <p className="text-sm text-green-600 mt-2">
+                  ✓ Las categorías se crearán automáticamente si no existen
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Descarga de plantilla */}
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Descarga la plantilla Excel que incluye ejemplos de productos con modificadores opcionales.
-              La plantilla tiene 3 hojas: Productos, Modificadores e Instrucciones.
+              Descarga la plantilla Excel que incluye ejemplos completos con categorías, productos y modificadores opcionales.
+              La plantilla tiene 4 hojas: Categorías, Productos, Modificadores e Instrucciones.
               <Button variant="link" onClick={createExcelTemplate} className="ml-2 p-0 h-auto">
                 <Download className="h-4 w-4 mr-1" />
                 Descargar Plantilla Excel
               </Button>
+            </AlertDescription>
+          </Alert>
+
+          {/* Información sobre categorías */}
+          <Alert>
+            <HelpCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Manejo de Categorías en Excel:</strong>
+              <ul className="mt-2 list-disc list-inside space-y-1 text-sm">
+                <li>La hoja "Categorías" es opcional: define categorías con nombre y descripción</li>
+                <li>En la hoja "Productos", incluye la columna "categoria_nombre" que debe coincidir con las categorías</li>
+                <li>Si no usas la hoja "Categorías", debes seleccionar una categoría existente abajo</li>
+                <li>Las categorías nuevas se crearán automáticamente si no existen</li>
+              </ul>
             </AlertDescription>
           </Alert>
 
@@ -381,6 +526,11 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
             <div className="space-y-2">
               <Label>Vista Previa de Datos</Label>
               <div className="bg-muted p-4 rounded-lg max-h-60 overflow-auto">
+                {uploadedData.categories && uploadedData.categories.length > 1 && (
+                  <p className="text-sm mb-2">
+                    <strong>Categorías encontradas:</strong> {uploadedData.categories.length - 1}
+                  </p>
+                )}
                 <p className="text-sm mb-2">
                   <strong>Productos encontrados:</strong> {uploadedData.products.length - 1}
                 </p>
@@ -404,10 +554,14 @@ export function ExcelImport({ onClose }: ExcelImportProps) {
             </Button>
             <Button 
               onClick={handleImport}
-              disabled={!uploadedData.products || uploadedData.products.length <= 1 || !selectedCategory}
+              disabled={
+                !uploadedData.products || 
+                uploadedData.products.length <= 1 || 
+                ((!uploadedData.categories || uploadedData.categories.length <= 1) && !selectedCategory)
+              }
             >
               <Upload className="h-4 w-4 mr-2" />
-              Importar Productos
+              Importar {uploadedData.categories && uploadedData.categories.length > 1 ? 'Categorías y ' : ''}Productos
             </Button>
           </div>
         </CardContent>

@@ -96,11 +96,12 @@ export function useIndexedDB() {
 
   const migrateFromLocalStorage = useCallback(async () => {
     try {
-      const localStorageData = localStorage.getItem("menu-builder-state")
+      const localStorageData = localStorage.getItem("menu-builder-state") || localStorage.getItem("menuBuilderData")
       if (localStorageData) {
         const parsedData = JSON.parse(localStorageData)
         await saveData(parsedData)
         localStorage.removeItem("menu-builder-state")
+        localStorage.removeItem("menuBuilderData")
         console.log("Data migrated from localStorage to IndexedDB")
         return parsedData
       }
